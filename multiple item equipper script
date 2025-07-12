@@ -1,0 +1,96 @@
+-- ⚙️ ZumHub Final Polished with Grid Inventory + Tool Icons + Equipped Highlight
+
+local Players = game:GetService("Players") local player = Players.LocalPlayer local backpack = player:WaitForChild("Backpack") local character = player.Character or player.CharacterAdded:Wait() local uis = game:GetService("UserInputService") local lighting = game:GetService("Lighting")
+
+-- 📦 GitHub Image URLs local loaderImageUrl = "https://raw.githubusercontent.com/UwURaww/ZumHubasset/refs/heads/main/file_00000000d32c622fa5e2331c374d3af8.png" local toggleImageUrl = "https://raw.githubusercontent.com/UwURaww/ZumHubasset/refs/heads/main/file_00000000533c622fb79af9ecd07497dd.png" local fallbackTexture = "https://raw.githubusercontent.com/UwURaww/ZumHubasset/main/file_00000000ca1461f88f4f0d1bdced4eb6.png"
+
+-- 💾 Local image paths local loaderImagePath = "ZumHubLoader.png" local toggleImagePath = "ZumHubToggle.png"
+
+-- 🌐 Download images if needed local request = syn and syn.request or http_request or request if request and writefile then if not isfile(loaderImagePath) then local res = request({Url = loaderImageUrl, Method = "GET"}) if res and res.StatusCode == 200 then writefile(loaderImagePath, res.Body) end end if not isfile(toggleImagePath) then local res = request({Url = toggleImageUrl, Method = "GET"}) if res and res.StatusCode == 200 then writefile(toggleImagePath, res.Body) end end end
+
+-- 🖼️ Load image assets local loaderAsset = getcustomasset and getcustomasset(loaderImagePath) local toggleAsset = getcustomasset and getcustomasset(toggleImagePath)
+
+-- 🪟 Main ScreenGui local gui = Instance.new("ScreenGui") gui.Name = "ZumHub" gui.ResetOnSpawn = false pcall(function() gui.Parent = game:GetService("CoreGui") end) if not gui.Parent then gui.Parent = player:WaitForChild("PlayerGui") end
+
+-- 🔄 Loader intro with blur + background if loaderAsset then local bg = Instance.new("Frame", gui) bg.Size = UDim2.new(1, 0, 1, 0) bg.BackgroundColor3 = Color3.new(0, 0, 0) bg.BackgroundTransparency = 0.4 bg.ZIndex = 1
+
+local blur = Instance.new("BlurEffect")
+blur.Size = 12
+blur.Parent = lighting
+
+local loader = Instance.new("ImageLabel", gui)
+loader.Size = UDim2.new(0, 200, 0, 200)
+loader.Position = UDim2.new(0.5, -100, 0.5, -100)
+loader.BackgroundTransparency = 1
+loader.Image = loaderAsset
+loader.ZIndex = 2
+
+task.wait(2.5)
+loader:Destroy()
+bg:Destroy()
+blur:Destroy()
+
+end
+
+-- 🔘 Toggle Button local toggle = Instance.new("ImageButton", gui) toggle.Size = UDim2.new(0, 64, 0, 64) toggle.Position = UDim2.new(0, 10, 0, 10) toggle.Image = toggleAsset or "" toggle.BackgroundColor3 = Color3.new(0, 0, 0) toggle.BackgroundTransparency = 0.3 toggle.Active = true Instance.new("UICorner", toggle).CornerRadius = UDim.new(1, 0)
+
+-- 🎮 Draggable Toggle local dragging, dragInput, dragStart, startPos toggle.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true dragStart = input.Position startPos = toggle.Position input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end) end end) uis.InputChanged:Connect(function(input) if dragging and input == dragInput then local delta = input.Position - dragStart toggle.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end) toggle.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end end)
+
+-- 🧱 Main Frame local frame = Instance.new("Frame", gui) frame.Size = UDim2.new(0, 340, 0, 380) frame.Position = UDim2.new(0, 80, 0, 80) frame.BackgroundColor3 = Color3.fromRGB(35, 35, 50) frame.Visible = true frame.Active = true frame.Draggable = true Instance.new("UICorner", frame)
+
+-- 📛 Title local title = Instance.new("TextLabel", frame) title.Size = UDim2.new(1, -90, 0, 30) title.Position = UDim2.new(0, 10, 0, 10) title.BackgroundTransparency = 1 title.Text = "ZumHub Inventory" title.TextColor3 = Color3.new(1, 1, 1) title.Font = Enum.Font.GothamBold title.TextSize = 18 title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- ❌ Close Button local close = Instance.new("TextButton", frame) close.Size = UDim2.new(0, 70, 0, 25) close.Position = UDim2.new(1, -80, 0, 10) close.Text = "Close" close.BackgroundColor3 = Color3.fromRGB(160, 60, 60) close.TextColor3 = Color3.new(1, 1, 1) close.Font = Enum.Font.GothamBold close.TextSize = 13
+
+-- 🔁 Refresh Button local refresh = Instance.new("TextButton", frame) refresh.Size = UDim2.new(0, 80, 0, 25) refresh.Position = UDim2.new(0, 10, 0, 45) refresh.Text = "Refresh" refresh.BackgroundColor3 = Color3.fromRGB(80, 120, 160) refresh.TextColor3 = Color3.new(1, 1, 1) refresh.Font = Enum.Font.GothamBold refresh.TextSize = 13
+
+-- 📜 Scrollable Grid List local scroll = Instance.new("ScrollingFrame", frame) scroll.Size = UDim2.new(1, -20, 1, -80) scroll.Position = UDim2.new(0, 10, 0, 80) scroll.CanvasSize = UDim2.new(0, 0, 0, 0) scroll.ScrollBarThickness = 6 scroll.BackgroundColor3 = Color3.fromRGB(20, 20, 30) scroll.BorderSizePixel = 0
+
+local layout = Instance.new("UIGridLayout", scroll) layout.CellSize = UDim2.new(0, 100, 0, 110) layout.CellPadding = UDim2.new(0, 10, 0, 10) layout.SortOrder = Enum.SortOrder.LayoutOrder layout.FillDirectionMaxCells = 3
+
+-- 🧱 Create Grid Tool Button with Highlight local function createToolButton(tool) local container = Instance.new("Frame", scroll) container.Size = UDim2.new(0, 100, 0, 110) container.BackgroundTransparency = 1
+
+local button = Instance.new("ImageButton", container)
+button.Size = UDim2.new(1, 0, 0, 80)
+button.Position = UDim2.new(0, 0, 0, 0)
+button.BackgroundTransparency = 1
+button.Image = tool.TextureId ~= "" and tool.TextureId or fallbackTexture
+
+local border = Instance.new("Frame", button)
+border.Size = UDim2.new(1, 0, 1, 0)
+border.Position = UDim2.new(0, 0, 0, 0)
+border.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+border.BackgroundTransparency = tool.Parent ~= character and 1 or 0.2
+border.BorderSizePixel = 0
+border.ZIndex = 2
+
+button.MouseButton1Click:Connect(function()
+	if tool.Parent == character then
+		tool.Parent = backpack
+	else
+		tool.Parent = character
+	end
+	refreshTools()
+end)
+
+local label = Instance.new("TextLabel", container)
+label.Size = UDim2.new(1, 0, 0, 25)
+label.Position = UDim2.new(0, 0, 1, -25)
+label.BackgroundTransparency = 1
+label.Text = tool.Name
+label.TextColor3 = Color3.new(1, 1, 1)
+label.Font = Enum.Font.Gotham
+label.TextSize = 13
+label.TextWrapped = true
+
+end
+
+-- 🔄 Refresh List function refreshTools() for _, v in ipairs(scroll:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end for _, tool in ipairs(backpack:GetChildren()) do if tool:IsA("Tool") then createToolButton(tool) end end for _, tool in ipairs(character:GetChildren()) do if tool:IsA("Tool") then createToolButton(tool) end end task.wait() scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10) end
+
+-- 🔗 Events refresh.MouseButton1Click:Connect(refreshTools) close.MouseButton1Click:Connect(function() gui:Destroy() end) toggle.MouseButton1Click:Connect(function() frame.Visible = not frame.Visible end)
+
+backpack.ChildAdded:Connect(function() task.wait(0.1); refreshTools() end) backpack.ChildRemoved:Connect(function() task.wait(0.1); refreshTools() end) character.ChildAdded:Connect(function() task.wait(0.1); refreshTools() end) character.ChildRemoved:Connect(function() task.wait(0.1); refreshTools() end)
+
+-- 🚀 Init refreshTools()
+
+  
