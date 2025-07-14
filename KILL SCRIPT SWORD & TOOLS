@@ -1,230 +1,279 @@
--- ZumHub - FE Kill GUI (Don't steal)
+-- SERVICES
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Camera = workspace.CurrentCamera
 local lp = Players.LocalPlayer
 
-pcall(function() game.CoreGui:FindFirstChild("SimKillGUI"):Destroy() end)
+-- CLEANUP
+for _, g in ipairs({"SimKillGUI", "ButtonGUI"}) do
+	local f = game.CoreGui:FindFirstChild(g)
+	if f then f:Destroy() end
+end
 
+-- GUI CONTAINERS
 local gui = Instance.new("ScreenGui", game.CoreGui)
 gui.Name = "SimKillGUI"
 gui.ResetOnSpawn = false
 
+local buttonGui = Instance.new("ScreenGui", game.CoreGui)
+buttonGui.Name = "ButtonGUI"
+buttonGui.ResetOnSpawn = false
+
+-- MAIN FRAME
 local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 240, 0, 340)
-frame.Position = UDim2.new(0, 100, 0.4, -160)
+frame.Size = UDim2.new(0, 330, 0, 430)
+frame.Position = UDim2.new(0, 50, 0.5, -215)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.Active = true
 frame.Draggable = true
 Instance.new("UICorner", frame)
 
-local title = Instance.new("TextLabel", frame)
-title.Size = UDim2.new(1, -30, 0, 25)
-title.Position = UDim2.new(0, 5, 0, 5)
-title.Text = "ZumHub - FE Kill"
-title.BackgroundTransparency = 1
-title.TextColor3 = Color3.new(1,1,1)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 16
-title.TextXAlignment = Enum.TextXAlignment.Left
-
+-- CLOSE BUTTON
 local closeBtn = Instance.new("TextButton", frame)
 closeBtn.Size = UDim2.new(0, 25, 0, 25)
 closeBtn.Position = UDim2.new(1, -30, 0, 5)
 closeBtn.Text = "X"
 closeBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
-closeBtn.TextColor3 = Color3.new(1,1,1)
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 14
+closeBtn.TextColor3 = Color3.new(1, 1, 1)
 Instance.new("UICorner", closeBtn)
-closeBtn.MouseButton1Click:Connect(function() gui:Destroy() end)
-
-local textbox = Instance.new("TextBox", frame)
-textbox.PlaceholderText = "Enter Player Name"
-textbox.Size = UDim2.new(1, -60, 0, 30)
-textbox.Position = UDim2.new(0, 10, 0, 40)
-textbox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-textbox.TextColor3 = Color3.new(1, 1, 1)
-textbox.Font = Enum.Font.Gotham
-textbox.TextSize = 14
-textbox.ClearTextOnFocus = false
-Instance.new("UICorner", textbox)
-
-local validIndicator = Instance.new("TextLabel", frame)
-validIndicator.Size = UDim2.new(0, 20, 0, 20)
-validIndicator.Position = UDim2.new(1, -45, 0, 45)
-validIndicator.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-validIndicator.Text = ""
-validIndicator.TextColor3 = Color3.new(1, 1, 1)
-validIndicator.Font = Enum.Font.GothamBold
-validIndicator.TextSize = 14
-Instance.new("UICorner", validIndicator)
-
-textbox:GetPropertyChangedSignal("Text"):Connect(function()
-	local name = textbox.Text
-	local found = false
-	for _, player in ipairs(Players:GetPlayers()) do
-		if player ~= lp and player.Name:lower():find(name:lower(), 1, true) then
-			found = true
-			break
-		end
-	end
-	validIndicator.BackgroundColor3 = found and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
+closeBtn.MouseButton1Click:Connect(function()
+	gui:Destroy()
+	buttonGui:Destroy()
 end)
 
-local addBtn = Instance.new("TextButton", frame)
-addBtn.Text = "+"
-addBtn.Size = UDim2.new(0, 30, 0, 30)
-addBtn.Position = UDim2.new(1, -40, 0, 40)
-addBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
-addBtn.TextColor3 = Color3.new(1, 1, 1)
-addBtn.Font = Enum.Font.GothamBold
-addBtn.TextSize = 20
-Instance.new("UICorner", addBtn)
+-- TITLE
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, -30, 0, 30)
+title.Position = UDim2.new(0, 5, 0, 5)
+title.Text = "ZumHub - FE Kill"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+title.BackgroundTransparency = 1
+title.TextXAlignment = Enum.TextXAlignment.Left
 
-local targets = {}
+-- SELECTED TARGETS
+local selectedTargets = {}
 
-local function updateTargetList()
-	for _, child in ipairs(frame:GetChildren()) do
-		if child:IsA("TextLabel") and child.Name == "Target" then
-			child:Destroy()
-		end
+local selectedList = Instance.new("ScrollingFrame", frame)
+selectedList.Size = UDim2.new(1, -20, 0, 100)
+selectedList.Position = UDim2.new(0, 10, 0, 40)
+selectedList.CanvasSize = UDim2.new(0, 0, 0, 0)
+selectedList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+selectedList.ScrollBarThickness = 4
+selectedList.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+selectedList.BorderSizePixel = 0
+Instance.new("UICorner", selectedList)
+local listLayout = Instance.new("UIListLayout", selectedList)
+listLayout.Padding = UDim.new(0, 4)
+
+local function updateSelectedGUI()
+	for _, v in ipairs(selectedList:GetChildren()) do
+		if not v:IsA("UIListLayout") then v:Destroy() end
 	end
+	for _, p in ipairs(selectedTargets) do
+		local item = Instance.new("Frame")
+		item.Size = UDim2.new(1, 0, 0, 36)
+		item.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+		Instance.new("UICorner", item)
 
-	for i, name in ipairs(targets) do
-		local label = Instance.new("TextLabel", frame)
-		label.Name = "Target"
-		label.Size = UDim2.new(1, -60, 0, 20)
-		label.Position = UDim2.new(0, 10, 0, 80 + (i - 1) * 22)
-		label.Text = name
-		label.TextColor3 = Color3.new(1,1,1)
-		label.BackgroundTransparency = 1
-		label.Font = Enum.Font.Gotham
-		label.TextSize = 14
+		local pic = Instance.new("ImageLabel", item)
+		pic.Size = UDim2.new(0, 30, 0, 30)
+		pic.Position = UDim2.new(0, 4, 0, 3)
+		pic.Image = "https://www.roblox.com/headshot-thumbnail/image?userId="..p.UserId.."&width=60&height=60&format=png"
+		pic.BackgroundTransparency = 1
 
-		local x = Instance.new("TextButton", label)
-		x.Text = "X"
-		x.Size = UDim2.new(0, 20, 0, 20)
-		x.Position = UDim2.new(1, 0, 0, 0)
-		x.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
-		x.TextColor3 = Color3.new(1, 1, 1)
-		x.Font = Enum.Font.GothamBold
-		x.TextSize = 12
-		Instance.new("UICorner", x)
-		x.MouseButton1Click:Connect(function()
-			table.remove(targets, i)
-			updateTargetList()
-		end)
-	end
-end
+		local nameLabel = Instance.new("TextLabel", item)
+		nameLabel.Size = UDim2.new(1, -80, 1, 0)
+		nameLabel.Position = UDim2.new(0, 40, 0, 0)
+		nameLabel.Text = p.Name
+		nameLabel.TextColor3 = Color3.new(1, 1, 1)
+		nameLabel.Font = Enum.Font.Gotham
+		nameLabel.TextSize = 14
+		nameLabel.BackgroundTransparency = 1
+		nameLabel.TextXAlignment = Enum.TextXAlignment.Left
 
-addBtn.MouseButton1Click:Connect(function()
-	local text = textbox.Text
-	if text ~= "" then
-		for _, v in ipairs(targets) do
-			if v:lower() == text:lower() then return end
-		end
-		table.insert(targets, text)
-		textbox.Text = ""
-		updateTargetList()
-	end
-end)
-
-local function findTarget(name)
-	for _, plr in ipairs(Players:GetPlayers()) do
-		if plr ~= lp and plr.Name:lower():find(name:lower(), 1, true) then
-			return plr
-		end
-	end
-end
-
-local function simulateHit(target)
-	if not target or not target.Character then return end
-	local hrp = target.Character:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
-
-	local toolPart
-	if lp.Character then
-		local tool = lp.Character:FindFirstChildOfClass("Tool")
-		if tool then
-			for _, part in ipairs(tool:GetDescendants()) do
-				if part:IsA("BasePart") then
-					toolPart = part
-					break
-				end
+		local removeBtn = Instance.new("TextButton", item)
+		removeBtn.Size = UDim2.new(0, 25, 0, 25)
+		removeBtn.Position = UDim2.new(1, -30, 0.5, -12)
+		removeBtn.Text = "X"
+		removeBtn.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+		removeBtn.TextColor3 = Color3.new(1, 1, 1)
+		Instance.new("UICorner", removeBtn)
+		removeBtn.MouseButton1Click:Connect(function()
+			for i, t in ipairs(selectedTargets) do
+				if t == p then table.remove(selectedTargets, i) break end
 			end
-		end
+			updateSelectedGUI()
+		end)
+		item.Parent = selectedList
 	end
-
-	if not toolPart then
-		local myHRP = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
-		if myHRP then
-			toolPart = myHRP
-		else
-			return
-		end
-	end
-
-	hrp.CFrame = toolPart.CFrame * CFrame.new(0, 1, 0)
 end
 
-local killButton = Instance.new("TextButton", frame)
-killButton.Text = "Kill Once"
-killButton.Size = UDim2.new(1, -20, 0, 28)
-killButton.Position = UDim2.new(0, 10, 1, -60)
-killButton.BackgroundColor3 = Color3.fromRGB(60, 0, 0)
-killButton.TextColor3 = Color3.new(1, 1, 1)
-killButton.Font = Enum.Font.GothamBold
-killButton.TextSize = 14
-Instance.new("UICorner", killButton)
+-- PLAYER LIST
+local playerList = Instance.new("ScrollingFrame", frame)
+playerList.Size = UDim2.new(1, -20, 0, 250)
+playerList.Position = UDim2.new(0, 10, 0, 150)
+playerList.CanvasSize = UDim2.new(0, 0, 0, 0)
+playerList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+playerList.ScrollBarThickness = 4
+playerList.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+playerList.BorderSizePixel = 0
+Instance.new("UICorner", playerList)
+local playerLayout = Instance.new("UIListLayout", playerList)
+playerLayout.Padding = UDim.new(0, 4)
 
-local loopButton = Instance.new("TextButton", frame)
-loopButton.Text = "Loop Kill"
-loopButton.Size = UDim2.new(1, -20, 0, 28)
-loopButton.Position = UDim2.new(0, 10, 1, -30)
-loopButton.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
-loopButton.TextColor3 = Color3.new(1, 1, 1)
-loopButton.Font = Enum.Font.GothamBold
-loopButton.TextSize = 14
-Instance.new("UICorner", loopButton)
-
-killButton.MouseButton1Click:Connect(function()
-	for _, name in ipairs(targets) do
-		local target = findTarget(name)
-		if target then simulateHit(target) end
+local function refreshPlayerList()
+	for _, c in ipairs(playerList:GetChildren()) do
+		if not c:IsA("UIListLayout") then c:Destroy() end
 	end
-end)
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= lp then
+			local btn = Instance.new("TextButton")
+			btn.Size = UDim2.new(1, 0, 0, 36)
+			btn.Text = ""
+			btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+			Instance.new("UICorner", btn)
 
-local looping = false
-local connection
+			local pic = Instance.new("ImageLabel", btn)
+			pic.Size = UDim2.new(0, 30, 0, 30)
+			pic.Position = UDim2.new(0, 4, 0, 3)
+			pic.Image = "https://www.roblox.com/headshot-thumbnail/image?userId="..p.UserId.."&width=60&height=60&format=png"
+			pic.BackgroundTransparency = 1
 
-loopButton.MouseButton1Click:Connect(function()
-	looping = not looping
-	loopButton.Text = looping and "Stop Loop" or "Loop Kill"
-	if looping then
-		connection = RunService.RenderStepped:Connect(function()
-			for _, name in ipairs(targets) do
-				local target = findTarget(name)
-				if target then simulateHit(target) end
-			end
-		end)
-	else
-		if connection then connection:Disconnect() end
+			local nameLabel = Instance.new("TextLabel", btn)
+			nameLabel.Size = UDim2.new(1, -50, 1, 0)
+			nameLabel.Position = UDim2.new(0, 40, 0, 0)
+			nameLabel.Text = p.Name
+			nameLabel.TextColor3 = Color3.new(1, 1, 1)
+			nameLabel.Font = Enum.Font.Gotham
+			nameLabel.TextSize = 14
+			nameLabel.BackgroundTransparency = 1
+			nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+			btn.MouseButton1Click:Connect(function()
+				for _, v in ipairs(selectedTargets) do if v == p then return end end
+				table.insert(selectedTargets, p)
+				updateSelectedGUI()
+			end)
+			btn.Parent = playerList
+		end
 	end
-end)
+end
+Players.PlayerAdded:Connect(refreshPlayerList)
+Players.PlayerRemoving:Connect(refreshPlayerList)
+refreshPlayerList()
 
+-- TOGGLE BUTTON FOR MAIN GUI
 local toggleBtn = Instance.new("TextButton", gui)
 toggleBtn.Size = UDim2.new(0, 40, 0, 40)
-toggleBtn.Position = UDim2.new(0, 20, 0.5, -20)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 200)
+toggleBtn.Position = UDim2.new(0, 15, 1, -60)
 toggleBtn.Text = "≡"
-toggleBtn.TextSize = 24
 toggleBtn.Font = Enum.Font.GothamBold
 toggleBtn.TextColor3 = Color3.new(1, 1, 1)
+toggleBtn.TextSize = 24
 toggleBtn.Draggable = true
+toggleBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 200)
 Instance.new("UICorner", toggleBtn)
 
 local visible = true
 toggleBtn.MouseButton1Click:Connect(function()
 	visible = not visible
 	frame.Visible = visible
+end)
+
+-- TOOL / ATTACK HELPERS
+local function getToolPart()
+	local tool = lp.Character and lp.Character:FindFirstChildOfClass("Tool")
+	if tool then
+		for _, p in ipairs(tool:GetDescendants()) do
+			if p:IsA("BasePart") then return p end
+		end
+	end
+	return lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+end
+
+-- BUTTON PANEL
+local btnFrame = Instance.new("Frame", buttonGui)
+btnFrame.Size = UDim2.new(0, 160, 0, 300)
+btnFrame.Position = UDim2.new(1, -180, 1, -320)
+btnFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+btnFrame.Active = true
+btnFrame.Draggable = true
+Instance.new("UICorner", btnFrame)
+
+-- BUTTONS
+local function makeBtn(txt, y, callback, group)
+	local b = Instance.new("TextButton", btnFrame)
+	b.Size = UDim2.new(1, -10, 0, 30)
+	b.Position = UDim2.new(0, 5, 0, y)
+	b.Text = txt
+	b.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	b.TextColor3 = Color3.new(1, 1, 1)
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 14
+	Instance.new("UICorner", b)
+	b.Visible = group ~= "extra"
+	b.Name = txt:gsub(" ", "")
+	b.MouseButton1Click:Connect(callback)
+	return b
+end
+
+local function simulateHit(p)
+	if not p.Character then return end
+	local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+	local toolPart = getToolPart()
+	if hrp and toolPart then
+		hrp.CFrame = toolPart.CFrame * CFrame.new(0, 1, 0)
+	end
+end
+
+local function damage(p) local h = p.Character and p.Character:FindFirstChild("Humanoid") if h then h:TakeDamage(10) end end
+local function fling(p) local hrp = p.Character and p.Character:FindFirstChild("HumanoidRootPart") if hrp then hrp.Velocity = Vector3.new(0, 100, 0) end end
+local function view(p) if p.Character and p.Character:FindFirstChild("Humanoid") then Camera.CameraSubject = p.Character.Humanoid end end
+
+makeBtn("Kill Once", 5, function() for _, p in ipairs(selectedTargets) do simulateHit(p) end end)
+local looping, loopConn = false
+makeBtn("Loop Kill", 40, function()
+	looping = not looping
+	if looping then
+		loopConn = RunService.RenderStepped:Connect(function() for _, p in ipairs(selectedTargets) do simulateHit(p) end end)
+	else if loopConn then loopConn:Disconnect() end
+	end
+end)
+
+local extrasVisible = false
+makeBtn("More...", 75, function()
+	extrasVisible = not extrasVisible
+	for _, child in ipairs(btnFrame:GetChildren()) do
+		if child:IsA("TextButton") and child.Name ~= "KillOnce" and child.Name ~= "LoopKill" and child.Name ~= "More..." then
+			child.Visible = extrasVisible
+		end
+	end
+end)
+
+makeBtn("Kill All", 110, function() for _, p in ipairs(Players:GetPlayers()) do if p ~= lp then simulateHit(p) end end end, "extra")
+makeBtn("Fling", 145, function() for _, p in ipairs(selectedTargets) do fling(p) end end, "extra")
+makeBtn("Damage", 180, function() for _, p in ipairs(selectedTargets) do damage(p) end end, "extra")
+makeBtn("View", 215, function() if #selectedTargets > 0 then view(selectedTargets[1]) end end, "extra")
+makeBtn("Unview", 250, function() Camera.CameraSubject = lp.Character:FindFirstChild("Humanoid") end, "extra")
+makeBtn("Clear Targets", 285, function() table.clear(selectedTargets) updateSelectedGUI() end, "extra")
+
+-- BUTTON GUI TOGGLE
+local buttonToggle = Instance.new("TextButton", buttonGui)
+buttonToggle.Size = UDim2.new(0, 40, 0, 40)
+buttonToggle.Position = UDim2.new(1, -230, 1, -60)
+buttonToggle.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
+buttonToggle.Text = "≡"
+buttonToggle.TextSize = 24
+buttonToggle.Font = Enum.Font.GothamBold
+buttonToggle.TextColor3 = Color3.new(1, 1, 1)
+buttonToggle.Draggable = true
+Instance.new("UICorner", buttonToggle)
+
+local showButtons = true
+buttonToggle.MouseButton1Click:Connect(function()
+	showButtons = not showButtons
+	btnFrame.Visible = showButtons
 end)
